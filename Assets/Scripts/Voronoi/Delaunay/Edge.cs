@@ -1,8 +1,9 @@
 ﻿using UnityEngine;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Voronoi {
+namespace csDelaunay {
 
 	/*
 	 * The line segment connecting the two Sites is part of the Delaunay triangulation
@@ -291,6 +292,16 @@ namespace Voronoi {
 				clippedVertices[LR.RIGHT] = new Vector2(x0, y0);
 				clippedVertices[LR.LEFT] = new Vector2(x1, y1);
 			}
+		}
+
+		public LineSegment delaunayLine()
+		{
+			return new LineSegment(LeftSite.Coord, RightSite.Coord);
+		}
+
+		public LineSegment voronoiEdge() {
+			if (!Visible()) return new LineSegment(Vector2Checker.getNull(), Vector2Checker.getNull());
+			return new LineSegment(clippedVertices[LR.LEFT], clippedVertices[LR.RIGHT]);
 		}
 		#endregion
 	}

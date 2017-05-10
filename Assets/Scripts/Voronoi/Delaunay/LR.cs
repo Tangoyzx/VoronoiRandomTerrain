@@ -1,5 +1,4 @@
-﻿
-namespace Voronoi {
+﻿namespace csDelaunay {
 	
 	public class LR {
 

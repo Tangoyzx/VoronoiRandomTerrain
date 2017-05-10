@@ -3,7 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Voronoi {
+namespace csDelaunay {
 
 	public class Site : ICoord {
 
@@ -19,7 +19,7 @@ namespace Voronoi {
 
 		public static void SortSites(List<Site> sites) {
 			sites.Sort(delegate(Site s0, Site s1) {
-				int returnValue = VoronoiCreator.CompareByYThenX(s0,s1);
+				int returnValue = Voronoi.CompareByYThenX(s0,s1);
 				
 				int tempIndex;
 				
@@ -46,7 +46,7 @@ namespace Voronoi {
 		}
 
 		public int CompareTo(Site s1) {
-			int returnValue = VoronoiCreator.CompareByYThenX(this,s1);
+			int returnValue = Voronoi.CompareByYThenX(this,s1);
 
 			int tempIndex;
 
@@ -175,9 +175,9 @@ namespace Voronoi {
 			if (edgeOrientations == null) {
 				ReorderEdges();
 				region = ClipToBounds(clippingBounds);
-				// if ((new Polygon(region)).PolyWinding() == Winding.CLOCKWISE) {
-				// 	region.Reverse();
-				// }
+				if ((new Polygon(region)).PolyWinding() == Winding.CLOCKWISE) {
+					region.Reverse();
+				}
 			}
 			return region;
 		}

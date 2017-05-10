@@ -3,7 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Voronoi {
+namespace csDelaunay {
 
 	public class SiteList {
 
@@ -71,6 +71,23 @@ namespace Voronoi {
 			}
 
 			return coords;
+		}
+
+		/*
+		 * 
+		 * @return the largest circle centered at each site that fits in its region;
+		 * if the region is infinite, return a circle of radius 0.
+		 */
+		public List<Circle> Circles() {
+			List<Circle> circles = new List<Circle>();
+			foreach (Site site in sites) {
+				float radius = 0;
+				Edge nearestEdge = site.NearestEdge();
+
+				if (!nearestEdge.IsPartOfConvexHull()) radius = nearestEdge.SitesDistance() * 0.5f;
+				circles.Add(new Circle(site.x,site.y, radius));
+			}
+			return circles;
 		}
 
 		public List<List<Vector2>> Regions(Rect plotBounds) {

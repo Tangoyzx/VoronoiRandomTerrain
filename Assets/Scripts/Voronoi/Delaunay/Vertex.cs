@@ -3,7 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Voronoi {
+namespace csDelaunay {
 
 	public class Vertex : ICoord {
 
@@ -91,7 +91,7 @@ namespace Voronoi {
 			intersectionX = (edge0.c * edge1.b - edge1.c * edge0.b)/determinant;
 			intersectionY = (edge1.c * edge0.a - edge0.c * edge1.a)/determinant;
 
-			if (VoronoiCreator.CompareByYThenX(edge0.RightSite, edge1.RightSite) < 0) {
+			if (Voronoi.CompareByYThenX(edge0.RightSite, edge1.RightSite) < 0) {
 				halfedge = halfedge0;
 				edge = edge0;
 			} else {

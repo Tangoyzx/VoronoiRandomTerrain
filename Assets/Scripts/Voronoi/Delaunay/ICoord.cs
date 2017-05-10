@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-namespace Voronoi {
+namespace csDelaunay {
 	public interface ICoord {
 
 		Vector2 Coord {get;set;}

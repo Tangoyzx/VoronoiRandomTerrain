@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
  
-using Voronoi;
+using csDelaunay;
  
 public class TestVoronoi : MonoBehaviour {
  
@@ -23,7 +23,7 @@ public class TestVoronoi : MonoBehaviour {
        
         // There is a two ways you can create the voronoi diagram: with or without the lloyd relaxation
         // Here I used it with 2 iterations of the lloyd relaxation
-        var voronoi = new VoronoiCreator(points,bounds,5);
+        var voronoi = new Voronoi(points,bounds,5);
  
         // But you could also create it without lloyd relaxtion and call that function later if you want
         //Voronoi voronoi = new Voronoi(points,bounds);
