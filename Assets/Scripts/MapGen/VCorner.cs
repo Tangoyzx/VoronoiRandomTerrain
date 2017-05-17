@@ -16,8 +16,8 @@ public class VCorner {
     public List<VEdge> protrudes;
     public List<VCorner> adjacent;
 
-    public int river;
+    public int river = 0;
     public VCorner downslope;
     public VCorner watershed;
-    public int watershed_size;
+    public int watershed_size = 0;
 }

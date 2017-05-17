@@ -4,12 +4,13 @@ using System.Collections.Generic;
 using csDelaunay;
 
 public class MapGen {
+	private readonly float LAKE_THRESHOLD = 0.3f;
 	private int size;
 	private Texture2D perlinTex;
 	private List<Vector2> points;
-	private List<VEdge> edges = new List<VEdge>();
-	private List<VCorner> corners = new List<VCorner>();
-	private List<VCenter> centers = new List<VCenter>();
+	public List<VEdge> edges = new List<VEdge>();
+	public List<VCorner> corners = new List<VCorner>();
+	public List<VCenter> centers = new List<VCenter>();
 	private Dictionary<int, List<VCorner>> _cornerMap = new Dictionary<int, List<VCorner>>();
 	public MapGen(int size, Texture2D perlinTex)
 	{
@@ -18,9 +19,6 @@ public class MapGen {
 	}
 	public void Create(int n) {
 		var points = GetRandomPoint(n);
-		// List<Vector2> points = new List<Vector2>();
-        // points.Add(new Vector2(100, 100));
-        // points.Add(new Vector2(100, 300));
 		var voronoi = new Voronoi(points,new Rect(0, 0, this.size, this.size), 3);
 
 		points.Clear();
@@ -31,40 +29,22 @@ public class MapGen {
 		BuildGraph(points, voronoi);
 		// voronoi.Dispose();
 		AssignCornerElevations();
+		AssignOceanCoastAndLand();
 
+		
+		RedistributeElevations(GetLandCorners(corners));
+		ClearNotLandElevations();
+		AssignPolygonElevations();
 
-		drawDebugEdge(points, voronoi);
-	}
+		// CalculateDownslopes();
+		// CalculateWatersheds();
+		// CreateRivers();
+		// RedistributeMoisture(GetLandCorners(corners));
+		// AssignPolygonMoisture();
 
-	private void drawDebugEdge(List<Vector2> points, Voronoi voronoi) {
-		Debug.DrawLine(new Vector3(), new Vector3(this.size, 0, 0), Color.blue, float.MaxValue);
-		Debug.DrawLine(new Vector3(this.size, 0, 0), new Vector3(this.size, this.size, 0), Color.blue, float.MaxValue);
-		Debug.DrawLine(new Vector3(this.size, this.size, 0), new Vector3(0, this.size, 0), Color.blue, float.MaxValue);
-		Debug.DrawLine(new Vector3(0, this.size, 0), new Vector3(0, 0, 0), Color.blue, float.MaxValue);
+		AssignBiomes();
 
-		foreach(var q in corners)
-		{
-			var point = q.point;
-			
-			var color = (q.water)?Color.blue:(q.elevation < 100)?Color.red:Color.green;
-			Debug.DrawLine(new Vector3(point.x - 2, point.y - 2, 0), new Vector3(point.x + 2, point.y - 2, 0), color,float.MaxValue);
-			Debug.DrawLine(new Vector3(point.x + 2, point.y - 2, 0), new Vector3(point.x + 2, point.y + 2, 0), color,float.MaxValue);
-			Debug.DrawLine(new Vector3(point.x + 2, point.y + 2, 0), new Vector3(point.x - 2, point.y + 2, 0), color,float.MaxValue);
-			Debug.DrawLine(new Vector3(point.x - 2, point.y + 2, 0), new Vector3(point.x - 2, point.y - 2, 0), color,float.MaxValue);
-		}
-
-		foreach(var edge in edges)
-		{
-			if (edge.v0 != null && edge.v1 != null) {
-				var color = (edge.v0.water || edge.v1.water)?Color.blue:Color.green;
-				Debug.DrawLine(new Vector3(edge.v0.point.x, edge.v0.point.y, 0), new Vector3(edge.v1.point.x, edge.v1.point.y, 0), color, float.MaxValue);
-				Debug.Log(edge.v0.point + "|" + edge.v1.point);
-			}
-
-			if (edge.d0 != null && edge.d1 != null) {
-				// Debug.DrawLine(new Vector3(edge.d0.point.x, edge.d0.point.y, 0), new Vector3(edge.d1.point.x, edge.d1.point.y, 0), Color.red, float.MaxValue);
-			}
-		}
+		// drawDebugEdge(points, voronoi);
 	}
 
 	private List<Vector2> GetRandomPoint(int n) {
@@ -173,7 +153,7 @@ public class MapGen {
 			{
 				var dx = point.x - qq.point.x;
 				var dy = point.y - qq.point.y;
-				if (dx * dx + dy * dy < float.Epsilon) {
+				if (dx * dx + dy * dy < 0.01f) {
 					return qq;
 				}
 			}
@@ -203,27 +183,236 @@ public class MapGen {
 			if (q1.border) {
 				q1.elevation = 0.0f;
 				queue.Enqueue(q1);
-			}
-			else {
+			} else {
 				q1.elevation = float.PositiveInfinity;
 			}
+		}
 
-			while (queue.Count > 0) {
-				var q = queue.Dequeue();
+		while (queue.Count > 0) {
+			var q = queue.Dequeue();
+			if ((q.elevation < 100) && (q.elevation > 0)) {
+				Debug.Log("1");
+			}
 
-				foreach(var s in q.adjacent) {
-					var newElevation = 0.01f + q.elevation;
-					if (!q.water && !s.water) {
-						newElevation += 1;
-					}
+			foreach(var s in q.adjacent) {
+				var newElevation = 0.01f + q.elevation;
+				if (!q.water && !s.water) {
+					newElevation += 1.0f;
+				}
 
-					if (newElevation < s.elevation) {
-						s.elevation = newElevation;
-						queue.Enqueue(s);
-					}
+				if (newElevation < s.elevation) {
+					s.elevation = newElevation;
+					queue.Enqueue(s);
 				}
 			}
 		}
+	}
+
+	private void AssignOceanCoastAndLand() {
+		var queue = new Queue<VCenter>();
+		foreach(var p in centers)
+		{
+			var numWater = 0;
+			foreach(var q in p.corners) {
+				if (q.border) {
+					p.border = true;
+					p.ocean = true;
+					q.water = true;
+					queue.Enqueue(p);
+				}
+				if (q.water) {
+					numWater += 1;
+				}
+			}
+			p.water = (p.ocean || numWater >= p.corners.Count * LAKE_THRESHOLD);
+		}
+		while (queue.Count > 0) {
+			var p = queue.Dequeue();
+			foreach(var r in p.neighbors) {
+				if (r.water && !r.ocean) {
+					r.ocean = true;
+					queue.Enqueue(r);
+				}
+			}
+		}
+
+		foreach(var p in centers) {
+			var numOcean = 0;
+			var numLand = 0;
+			foreach(var r in p.neighbors) {
+				numOcean += (r.ocean)?1:0;
+				numLand += (!r.water)?1:0;
+			}
+			p.coast = (numOcean > 0) && (numLand > 0);
+		}
+
+		foreach(var q in corners) {
+			var numOcean = 0;
+			var numLand = 0;
+			foreach(var p in q.touches) {
+				numOcean += (p.ocean)?1:0;
+				numLand += (!p.water)?1:0;
+			}
+			q.ocean = (numOcean == q.touches.Count);
+			q.coast = (numOcean > 0) && (numLand > 0);
+			q.water = q.border || ((numLand != q.touches.Count) && !q.coast);
+		}
+	}
+
+	private void RedistributeElevations(List<VCorner> locations)
+	{
+		var SCALE_FACTOR = 1.1f;
+		
+		locations.Sort(sortOnElevation);
+		for(var i = 0; i < locations.Count; i++)
+		{
+			var y = (float)i / (locations.Count - 1.0f);
+			var x = Mathf.Sqrt(SCALE_FACTOR) - Mathf.Sqrt(SCALE_FACTOR * (1 - y));
+			if (x > 1.0f) x = 1.0f;
+			locations[i].elevation = x;
+		}
+	}
+
+	private void ClearNotLandElevations()
+	{
+		foreach(var q in corners) {
+			if (q.ocean || q.coast) {
+				q.elevation = 0.0f;
+			} else {
+				Debug.Log("ele: " + q.elevation);
+			}
+			
+		}
+	}
+
+	private void AssignPolygonElevations() {
+		foreach(var p in centers) {
+			var sumElevation = 0.0f;
+			foreach(var q in p.corners) {
+				sumElevation += q.elevation;
+			}
+			p.elevation = sumElevation / p.corners.Count;
+		}
+	}
+
+	private void CalculateDownslopes() {
+		foreach(var q in corners) {
+			var r = q;
+			foreach(var s in q.adjacent) {
+				if (s.elevation <= r.elevation) {
+					r = s;
+				}
+			}
+			q.downslope = r;
+		}
+	}
+
+	private void CalculateWatersheds() {
+		foreach(var q in corners) {
+			q.watershed = q;
+			if (!q.ocean && !q.coast) {
+				q.watershed = q.downslope;
+			}
+		}
+
+		for(var i = 0; i < 100; i++)
+		{
+			var changed = false;
+			foreach(var q in corners) {
+				if (!q.ocean && !q.coast && !q.watershed.coast) {
+					var r = q.downslope.watershed;
+					if (!r.ocean) {
+						q.watershed = r;
+						changed = true;
+					}
+				}
+			}
+			if (!changed) break;
+		}
+
+		foreach(var q in corners) {
+			var r = q.watershed;
+			r.watershed_size = 1 + r.watershed_size;
+		}
+	}
+
+	private void CreateRivers() {
+		for(var i = 0; i < size * 0.5f; i++)
+		{
+			var q = corners[Random.Range(0, corners.Count - 1)];
+			if (q.ocean || q.elevation < 0.3f || q.elevation > 0.9f) continue;
+			while (!q.coast) {
+				if (q == q.downslope) break;
+				var edge = LookUpEdgeFromCorner(q, q.downslope);
+				edge.river = edge.river + 1;
+				q.river = q.river + 1;
+				q.downslope.river = q.downslope.river + 1;
+				q = q.downslope;
+			}
+		}
+	}
+
+	private void AssignCornerMoisture() {
+		var queue = new Queue<VCorner>();
+		foreach(var q in corners) {
+			if ((q.water || q.river > 0) && !q.ocean) {
+				q.moisture = (q.river > 0)?Mathf.Min(3.0f, (0.2f * q.river)):1.0f;
+				queue.Enqueue(q);
+			} else {
+				q.moisture = 0.0f;
+			}
+		}
+
+		while (queue.Count > 0) {
+			var q = queue.Dequeue();
+			foreach(var r in q.adjacent) {
+				var newMoisture = q.moisture * 0.9f;
+				if (newMoisture > r.moisture) {
+					r.moisture = newMoisture;
+					queue.Enqueue(r);
+				}
+			}
+		}
+
+		foreach(var q in corners) {
+			if (q.ocean || q.coast) {
+				q.moisture = 1.0f;
+			}
+		}
+	}
+
+	private void RedistributeMoisture(List<VCorner> locations) {
+		locations.Sort(sortOnMoisture);
+		for(var i = 0; i < locations.Count; i++)
+		{
+			locations[i].moisture = (float)i / (locations.Count - 1);
+		}
+	}
+
+	private void AssignPolygonMoisture() {
+		foreach(var p in centers) {
+			var sumMoisture = 0.0f;
+			foreach(var q in p.corners) {
+				if (q.moisture > 1.0f) q.moisture = 1.0f;
+				sumMoisture += q.moisture;
+			}
+			p.moisture = sumMoisture / p.corners.Count;
+		}
+	}
+
+	private void AssignBiomes() {
+		foreach(var p in centers) {
+			p.biome = GetBiome(p);
+		}
+	}
+
+	private int sortOnElevation(VCorner ca, VCorner cb)
+	{
+		return (int)(ca.elevation - cb.elevation);
+	}
+
+	private int sortOnMoisture(VCorner ca, VCorner cb) {
+		return (int)(ca.moisture - cb.moisture);
 	}
 
 	private bool IsInLand(Vector2 point)
@@ -231,5 +420,53 @@ public class MapGen {
 		var q = new Vector2(point.x / size * 2.0f - 1.0f, point.y / size * 2.0f - 1.0f);
 		var c = perlinTex.GetPixel((int)(q.x+1) * perlinTex.width / 2, (int)(q.y+1) * perlinTex.height / 2);
 		return c.r > (0.3 + 0.3 * q.sqrMagnitude);
+	}
+
+	private List<VCorner> GetLandCorners(List<VCorner> corners) {
+		var locations = new List<VCorner>();
+		foreach(var q in corners) {
+			if (!q.ocean && !q.coast) {
+				locations.Add(q);
+			}
+		}
+		return locations;
+	}
+
+	private VEdge LookUpEdgeFromCorner(VCorner q, VCorner s) {
+		foreach(var edge in q.protrudes) {
+			if (edge.v0 == s || edge.v1 == s) return edge;
+		}
+		return null;
+	}
+
+	private string GetBiome(VCenter p) {
+		if (p.ocean) {
+        return "OCEAN";
+      } else if (p.water) {
+        if (p.elevation < 0.1) return "MARSH";
+        if (p.elevation > 0.8) return "ICE";
+        return "LAKE";
+      } else if (p.coast) {
+        return "BEACH";
+      } else if (p.elevation > 0.8) {
+        if (p.moisture > 0.50) return "SNOW";
+        else if (p.moisture > 0.33) return "TUNDRA";
+        else if (p.moisture > 0.16) return "BARE";
+        else return "SCORCHED";
+      } else if (p.elevation > 0.6) {
+        if (p.moisture > 0.66) return "TAIGA";
+        else if (p.moisture > 0.33) return "SHRUBLAND";
+        else return "TEMPERATE_DESERT";
+      } else if (p.elevation > 0.3) {
+        if (p.moisture > 0.83) return "TEMPERATE_RAIN_FOREST";
+        else if (p.moisture > 0.50) return "TEMPERATE_DECIDUOUS_FOREST";
+        else if (p.moisture > 0.16) return "GRASSLAND";
+        else return "TEMPERATE_DESERT";
+      } else {
+        if (p.moisture > 0.66) return "TROPICAL_RAIN_FOREST";
+        else if (p.moisture > 0.33) return "TROPICAL_SEASONAL_FOREST";
+        else if (p.moisture > 0.16) return "GRASSLAND";
+        else return "SUBTROPICAL_DESERT";
+      }
 	}
 }
