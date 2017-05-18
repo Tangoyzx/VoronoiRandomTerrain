@@ -8,7 +8,7 @@ public class Test1 : MonoBehaviour {
 	// Use this for initialization
 	void Start () {
 		var mapgen = new MapGen(512, perlinTex);
-		mapgen.Create(200);
+		mapgen.Create(600);
         var r = GetComponent<Renderer>();
 
         DrawTexture(mapgen);
@@ -23,12 +23,14 @@ public class Test1 : MonoBehaviour {
 
         var verticeList = new List<Vector3>();
         var triangles = new List<int>();
+        var colorList = new List<Color>();
         var cornerVerticeIndexMap = new Dictionary<int, int>();
 
         foreach(var center in mapGen.centers) {
             var v0 = new Vector3(center.point.x, center.elevation * 50.0f, center.point.y);
             var v0Index = verticeList.Count;
             verticeList.Add(v0);
+            colorList.Add(getColor(center.water, center.coast));
             foreach(var edge in center.borders) {
                 if (edge.v0 == null || edge.v1 == null) {
                     continue;
@@ -36,8 +38,8 @@ public class Test1 : MonoBehaviour {
                 var v1 = edge.v0;
                 var v2 = edge.v1;
                 
-                var v1Index = GetCornerIndex(verticeList, cornerVerticeIndexMap, v1);
-                var v2Index = GetCornerIndex(verticeList, cornerVerticeIndexMap, v2);
+                var v1Index = GetCornerIndex(verticeList, cornerVerticeIndexMap, colorList, v1);
+                var v2Index = GetCornerIndex(verticeList, cornerVerticeIndexMap, colorList, v2);
 
                 var v01 = verticeList[v1Index] - v0;
                 var v02 = verticeList[v2Index] - v0;
@@ -55,15 +57,22 @@ public class Test1 : MonoBehaviour {
 
         mf.mesh.vertices = verticeList.ToArray();
         mf.mesh.triangles = triangles.ToArray();
+        mf.mesh.colors = colorList.ToArray();
         mf.mesh.RecalculateNormals();
         mr.materials = new Material[]{terrainMat};
     }
 
-    private int GetCornerIndex(List<Vector3> vertices, Dictionary<int, int> map, VCorner corner) {
+    private Color getColor(bool isWater, bool isCoast) {
+        var color = (isWater)?(Color.blue):(isCoast?Color.green:Color.red);
+        return color;
+    }
+
+    private int GetCornerIndex(List<Vector3> vertices, Dictionary<int, int> map, List<Color> colorList, VCorner corner) {
         if (map.ContainsKey(corner.index)) return map[corner.index];
         var newIndex = vertices.Count;
         map.Add(corner.index, newIndex);
         vertices.Add(new Vector3(corner.point.x, corner.elevation * 50.0f, corner.point.y));
+        colorList.Add(getColor(corner.water, corner.coast));
         return newIndex;
     }
 
@@ -74,25 +83,26 @@ public class Test1 : MonoBehaviour {
 		var colorLand = Color.green;
 		var tex = new Texture2D(512, 512);
 
-        foreach(var center in mapGen.centers) {
-            var color = (center.ocean)?(colorOcean):(center.coast?colorCoast:colorLand);
-            DrawRect(center.point, 2, tex, color);
-        }
+        // foreach(var center in mapGen.centers) {
+        //     var color = (center.ocean)?(colorOcean):(center.coast?colorCoast:colorLand);
+        //     DrawRect(center.point, 2, tex, color);
+        // }
 
-        foreach(var edge in mapGen.edges) {
-            if (edge.v0 == null) {
-                if (edge.v1 == null) continue;
-                else DrawRect(edge.v1.point, 5, tex, Color.green);
-            } else if (edge.v1 == null) {
-                DrawRect(edge.v0.point, 5, tex, Color.green);
-            } else {
-                DrawLine(edge.v0.point, edge.v1.point, tex, Color.red);
-            }
-        }
+        // foreach(var edge in mapGen.edges) {
+        //     if (edge.v0 == null) {
+        //         if (edge.v1 == null) continue;
+        //         else DrawRect(edge.v1.point, 5, tex, Color.green);
+        //     } else if (edge.v1 == null) {
+        //         DrawRect(edge.v0.point, 5, tex, Color.green);
+        //     } else {
+        //         DrawLine(edge.v0.point, edge.v1.point, tex, Color.red);
+        //     }
+        // }
 
         foreach(var corner in mapGen.corners) {
             var color = (corner.water)?Color.blue:Color.yellow;
-            DrawRect(corner.point, 5, tex, color);
+            // var color = (corner.river > 0)?Color.blue:Color.green;
+            DrawRect(corner.point, 2, tex, color);
         }
 
         tex.Apply();

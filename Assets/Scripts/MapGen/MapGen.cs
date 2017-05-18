@@ -36,11 +36,11 @@ public class MapGen {
 		ClearNotLandElevations();
 		AssignPolygonElevations();
 
-		// CalculateDownslopes();
-		// CalculateWatersheds();
-		// CreateRivers();
-		// RedistributeMoisture(GetLandCorners(corners));
-		// AssignPolygonMoisture();
+		CalculateDownslopes();
+		CalculateWatersheds();
+		CreateRivers();
+		RedistributeMoisture(GetLandCorners(corners));
+		AssignPolygonMoisture();
 
 		AssignBiomes();
 
@@ -190,14 +190,13 @@ public class MapGen {
 
 		while (queue.Count > 0) {
 			var q = queue.Dequeue();
-			if ((q.elevation < 100) && (q.elevation > 0)) {
-				Debug.Log("1");
-			}
 
 			foreach(var s in q.adjacent) {
 				var newElevation = 0.01f + q.elevation;
 				if (!q.water && !s.water) {
 					newElevation += 1.0f;
+
+					newElevation += Random.Range(0.0f, 2.0f);
 				}
 
 				if (newElevation < s.elevation) {
@@ -278,10 +277,7 @@ public class MapGen {
 		foreach(var q in corners) {
 			if (q.ocean || q.coast) {
 				q.elevation = 0.0f;
-			} else {
-				Debug.Log("ele: " + q.elevation);
 			}
-			
 		}
 	}
 
@@ -337,7 +333,7 @@ public class MapGen {
 	}
 
 	private void CreateRivers() {
-		for(var i = 0; i < size * 0.5f; i++)
+		for(var i = 0; i < size * 0.2f; i++)
 		{
 			var q = corners[Random.Range(0, corners.Count - 1)];
 			if (q.ocean || q.elevation < 0.3f || q.elevation > 0.9f) continue;
@@ -418,8 +414,8 @@ public class MapGen {
 	private bool IsInLand(Vector2 point)
 	{
 		var q = new Vector2(point.x / size * 2.0f - 1.0f, point.y / size * 2.0f - 1.0f);
-		var c = perlinTex.GetPixel((int)(q.x+1) * perlinTex.width / 2, (int)(q.y+1) * perlinTex.height / 2);
-		return c.r > (0.3 + 0.3 * q.sqrMagnitude);
+		var c = perlinTex.GetPixel((int)((q.x+1.0f) * perlinTex.width * 0.5f), (int)((q.y+1.0f) * perlinTex.height * 0.5f));
+		return (q.sqrMagnitude < 0.7f && c.r > 0.41f);
 	}
 
 	private List<VCorner> GetLandCorners(List<VCorner> corners) {
